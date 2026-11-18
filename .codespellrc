@@ -1,0 +1,3 @@
+[codespell]
+# Domain-specific abbreviations and proper names used in recipe code and docs.
+ignore-words-list = ans,ba,clat,clon,cmip,cmor,cfgrib,esmf,healpix,orcestra,reflow,slurm,zarr
