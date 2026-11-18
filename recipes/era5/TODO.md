@@ -1,5 +1,23 @@
 # TODO
 
+## Grid Doctor integration
+
+| Area | Current ERA5 workflow | Grid Doctor | Status / next action |
+| --- | --- | --- | --- |
+| Dependency | Pinned upstream Git revision | Current library revision | ✅ Upgrade only in dedicated, tested commits. |
+| Remapping | `cached_weights` → `regrid_to_healpix` | Same public APIs | ✅ Aligned. |
+| Coarsening | Writes the finest level, then reopens and coarsens level by level | Can build a whole pyramid in memory | ✅ Keep the lower-memory incremental approach. |
+| Output layout | Migrating to `<frequency>.zarr/level_<N>` | Native multiscale tree | 🚧 Complete readers, writers, cleanup, merge, Reflow, and tests. |
+| Zarr | Default V2, optional V3 | Supports V2 and V3 | ⬜ Test create, append, overlap replacement, cleanup, and merge for both. |
+| Metadata | Public `HealpixGrid`, `HealpixMetadata`, and `attach_cell_coords` | CF HEALPix metadata API | ✅ Aligned. |
+| Fan-out | Custom incremental publisher and Reflow merge | Optional manifest/fan-out writer | ⬜ Decide whether to adopt it later. |
+| Tooling | Ruff targets Python 3.10 | Grid Doctor requires Python 3.11+ | ⬜ Update Ruff's target version to Python 3.11. |
+| Documentation | Historical local-source reference remains below | External library | ⬜ Replace `../../src/grid_doctor/...` with upstream docs or an issue. |
+
+---
+
+## Historical workflow notes
+
 - [x] Cache fallback GRIB inventories per source file, rather than per complete file collection, so overlapping runs reuse scanned files.
 - [x] Read provider `.index` sidecars as the preferred per-file inventory source; fall back to the ecCodes-derived per-file cache when absent or invalid.
 - [ ] Evaluate replacing the per-file pickle fallback with a dedicated SQLite cache after measuring cache count, size, hit rate, and parallel filesystem locking behaviour.

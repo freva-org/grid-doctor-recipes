@@ -43,7 +43,7 @@ from .zarr_publisher import (
 )
 
 LOGGER = logging.getLogger(__name__)
-LEVEL_RE = re.compile(r"level_(?P<level>\d+)\.zarr$")
+LEVEL_RE = re.compile(r"level_(?P<level>\d+)$")
 HEALPIX_DIR_MODE = 0o2775
 PROTECTED_GRID_ATTRS = {
     "healpix_level",

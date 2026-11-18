@@ -11,6 +11,21 @@ The main entry point is the installed `heal-era5` command.
 For the command and helper relationships, see the
 [function call graph](FUNCTION_CALL_GRAPH.md).
 
+## Output layout
+
+Each dataset frequency is published as one native Grid Doctor multiscale Zarr
+tree. HEALPix levels are groups within that tree rather than separate stores:
+
+```text
+<output-root>/era5/P1M.zarr/
+├── level_0/
+├── level_1/
+└── level_9/
+```
+
+The root `P1M.zarr` group carries the multiscales metadata; for example, the
+monthly level-9 output is at `era5/P1M.zarr/level_9`.
+
 The installed remapper version is shown by:
 
 ```console

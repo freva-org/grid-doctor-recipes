@@ -57,7 +57,7 @@ from ..main import (
 
 wf = Workflow("era5_healpix")
 
-LEVEL_RE = re.compile(r"level_(?P<level>\d+)\.zarr$")
+LEVEL_RE = re.compile(r"level_(?P<level>\d+)$")
 SOURCE_MAPPER = load_json(DEFAULT_SOURCE_MAPPER)
 REFLOW_BATCHING_POLICY = SOURCE_MAPPER.get("reflow_batching_policy", {})
 DEFAULT_WEIGHTS_DIR = str(SOURCE_MAPPER["weights_path"])

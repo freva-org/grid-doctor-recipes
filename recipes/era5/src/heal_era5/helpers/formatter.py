@@ -33,12 +33,15 @@ def destination_for_level(
     *,
     output_path: str | Path | None = None,
 ) -> str:
-    """Return the concrete Zarr store path for one frequency and HEALPix level."""
+    """Return the native Grid Doctor multiscale group for one HEALPix level."""
 
     if output_path is not None:
         root_path = Path(output_path)
         return str(
-            root_path / str(dataset) / str(SOURCE_MAPPER["output_frequency"][frequency]) / f"level_{zoom_number}.zarr"
+            root_path
+            / str(dataset)
+            / f"{SOURCE_MAPPER['output_frequency'][frequency]}.zarr"
+            / f"level_{zoom_number}"
         )
 
     return SOURCE_MAPPER["output_path"].format(
@@ -97,11 +100,11 @@ def existing_destinations_for_frequency(
     *,
     output_path: str | Path | None = None,
 ) -> tuple[str, ...]:
-    """Return existing Zarr stores for one output frequency."""
+    """Return existing native Grid Doctor multiscale groups for one frequency."""
 
     output_frequency = SOURCE_MAPPER["output_frequency"][frequency]
     if output_path is not None:
-        pattern = str(Path(output_path) / str(dataset) / str(output_frequency) / "level_*.zarr")
+        pattern = str(Path(output_path) / str(dataset) / f"{output_frequency}.zarr" / "level_*")
     else:
         pattern = SOURCE_MAPPER["output_path"].format(
             dataset=dataset,
@@ -109,3 +112,9 @@ def existing_destinations_for_frequency(
             zoom_number="*",
         )
     return tuple(sorted(glob(pattern)))
+
+
+def multiscales_root_for_destination(destination: str | Path) -> Path:
+    """Return the frequency Zarr root containing a ``level_*`` group."""
+
+    return Path(destination).parent

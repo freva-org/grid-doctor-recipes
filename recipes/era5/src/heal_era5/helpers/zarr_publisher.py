@@ -10,13 +10,14 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+import grid_doctor as gd
 import numpy as np
 import xarray as xr
 import zarr
 
 from .datasets import normalise_published_dataset
 from .file_fetcher import SOURCE_MAPPER
-from .formatter import merge_dataset_root
+from .formatter import merge_dataset_root, multiscales_root_for_destination
 from .logging_utils import compute_with_task_progress
 from .metadata import (
     LAST_DATA_UPDATE_ATTR,
@@ -27,7 +28,7 @@ from .metadata import (
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TARGET_CHUNK_MB = 100
-LEVEL_RE = re.compile(r"level_(?P<level>\d+)\.zarr$")
+LEVEL_RE = re.compile(r"level_(?P<level>\d+)$")
 
 
 def _string_name(name: Hashable) -> str:
@@ -216,6 +217,35 @@ def _to_zarr(
     )
 
 
+def _sync_multiscales_metadata(destination: str, *, zarr_format: int) -> None:
+    """Write Grid Doctor's multiscale metadata for all level groups in one root."""
+
+    root_path = multiscales_root_for_destination(destination)
+    root = zarr.open_group(root_path, mode="a")
+    levels = sorted(
+        (
+            int(name.removeprefix("level_"))
+            for name in root.group_keys()
+            if re.fullmatch(r"level_\d+", name)
+        ),
+        reverse=True,
+    )
+    pyramid: dict[int, xr.Dataset] = {}
+    try:
+        for level in levels:
+            pyramid[level] = xr.open_zarr(
+                root_path,
+                group=f"level_{level}",
+                consolidated=(zarr_format == 2),
+            )
+        root.attrs.update(gd.metadata.PyramidMetadata.from_pyramid(pyramid).to_attrs())
+    finally:
+        for dataset in pyramid.values():
+            dataset.close()
+    if zarr_format == 2:
+        zarr.consolidate_metadata(root_path)
+
+
 def _write_dataset(
     dataset: xr.Dataset,
     destination: str,
@@ -240,6 +270,7 @@ def _write_dataset(
         # with the existing Zarr chunk grid.
         options["align_chunks"] = True
         _to_zarr(dataset, destination, progress_label=progress_label, **options)
+        _sync_multiscales_metadata(destination, zarr_format=zarr_format)
         return
 
     encoding = _encoding_for_target_chunks(dataset, target_mb=target_chunk_mb)
@@ -266,6 +297,7 @@ def _write_dataset(
         **options,
         encoding=encoding,
     )
+    _sync_multiscales_metadata(destination, zarr_format=zarr_format)
 
 
 def _rewrite_dataset_via_temp(
@@ -1091,9 +1123,9 @@ def _dataset_root_destinations(
             if frequency is None:
                 continue
             target_frequency = Path(target_root) / source_frequency.name
-            for source_store in sorted(source_frequency.glob("level_*.zarr")):
+            for source_store in sorted(source_frequency.glob("*.zarr/level_*")):
                 if _is_selected_level_store(source_store, levels):
-                    yield source_store, str(target_frequency / source_store.name)
+                    yield source_store, str(target_frequency / source_store.relative_to(source_frequency))
 
 
 def merge_zarr_stores(
@@ -1117,7 +1149,8 @@ def merge_zarr_stores(
     ``frequency``, ``variable``, ``levels``, ``pressure_levels``, and ``interval`` optionally filter
     those worker directories and stores. ``levels=None`` selects all available
     levels. The interval is inclusive and applies to time-dependent stores.
-    Without ``dataset``, sources must directly contain ``level_*.zarr`` stores.
+    Without ``dataset``, sources must directly contain frequency Zarr roots
+    with native Grid Doctor ``level_*`` groups.
     """
 
     selected_frequencies = _frequency_names(frequency)
@@ -1146,7 +1179,7 @@ def merge_zarr_stores(
         source_destinations = (
             (source_store, str(target_path / source_store.name))
             for source in sources
-            for source_store in sorted(Path(source).glob("level_*.zarr"))
+            for source_store in sorted(Path(source).glob("*.zarr/level_*"))
             if _is_selected_level_store(source_store, levels)
         )
 

@@ -15,7 +15,7 @@ from .formatter import dataset_output_root, existing_destinations_for_frequency
 from .zarr_publisher import _rewrite_dataset_via_temp
 
 LOGGER = logging.getLogger(__name__)
-LEVEL_RE = re.compile(r"level_(?P<level>\d+)\.zarr$")
+LEVEL_RE = re.compile(r"level_(?P<level>\d+)$")
 
 
 def existing_level_destinations(
