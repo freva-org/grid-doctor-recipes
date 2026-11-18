@@ -7,7 +7,6 @@ from typing import Any
 import grid_doctor as gd
 import numpy as np
 import xarray as xr
-from grid_doctor.remap import _healpix_centres, _make_crs_variable
 
 from .file_fetcher import (
     extract_output_attrs,
@@ -64,28 +63,21 @@ def _areacella_data_array(
 def _attach_healpix_metadata(ds: xr.Dataset, *, zoom_number: int) -> xr.Dataset:
     """Attach the HEALPix coordinates and attrs expected by downstream code."""
 
-    nside = 2 ** int(zoom_number)
-    order = "nested"
-    lat_deg, lon_deg = _healpix_centres(int(zoom_number), nest=True)
-    ds = ds.assign_coords(
-        cell=np.arange(lat_deg.size, dtype=np.int64),
-        latitude=("cell", lat_deg),
-        longitude=("cell", lon_deg),
-        crs=_make_crs_variable(
-            level=int(zoom_number),
-            nside=nside,
-            order=order,
-        ),
+    level = int(zoom_number)
+    grid = gd.metadata.HealpixGrid(level=level, earth_radius=EARTH_RADIUS_M)
+    cells = np.arange(grid.npix, dtype=np.int64)
+    ds = gd.attach_cell_coords(ds, cells, level=level)
+    ds = gd.metadata.HealpixMetadata(grid).apply(ds)
+
+    ds.attrs.update(
+        {
+            "healpix_level": level,
+            "healpix_nside": grid.nside,
+            "healpix_order": grid.indexing_scheme,
+            "grid_doctor_version": gd.__version__,
+        }
     )
 
-    for name in ds.data_vars:
-        if "cell" in ds[name].dims:
-            ds[name].attrs["grid_mapping"] = "crs"
-
-    ds.attrs["healpix_level"] = int(zoom_number)
-    ds.attrs["healpix_nside"] = nside
-    ds.attrs["healpix_order"] = order
-    ds.attrs["grid_doctor_version"] = gd.__version__
     return ds
 
 

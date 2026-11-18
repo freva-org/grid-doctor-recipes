@@ -19,45 +19,39 @@ heal-era5 --version
 
 ## Installation
 
-The workflow uses the normal `grid_doctor` package, a small native Conda
-dependency overlay, and a local checkout of the ERA5 CMOR tables.
+The workflow installs a pinned Grid Doctor revision from its upstream Git
+repository, a small native Conda dependency overlay, and a local checkout of
+the ERA5 CMOR tables.
 
 1. Create and activate a conda or mamba environment:
 
    ```console
-   mamba create -n grid_doctor -c conda-forge python=3.11 pip
-   mamba activate grid_doctor
+   mamba create -n heal-era5 -c conda-forge python=3.11 pip
+   mamba activate heal-era5
    ```
 
-2. From the repository root, install `grid_doctor` itself into that environment:
+2. Install the native GRIB and regridding libraries:
 
    ```console
-   python3 -m pip install -e .
+   mamba env update -p "$CONDA_PREFIX" -f era5/environment.yml
    ```
 
-3. Install the native GRIB and regridding libraries:
+3. From the repository root, install the workflow in editable mode. This
+   installs its Python dependencies, including the pinned Grid Doctor revision:
 
    ```console
-   mamba env update -p "$CONDA_PREFIX" -f scripts/era5land/environment.yml
-   ```
-
-4. Install the normal remapper workflow in editable mode from the repository root.
-   This installs Python dependencies including `cfgrib` and `rich-argparse`; it
-   uses the editable local `grid_doctor` package installed in the previous step:
-
-   ```console
-   python3 -m pip install -e scripts/era5land
+   python3 -m pip install -e era5
    ```
 
    This provides the `heal-era5` command.
 
-5. Download or refresh the external ERA5 CMOR tables:
+4. Download or refresh the external ERA5 CMOR tables:
 
    ```console
-   make -C scripts/era5land download
+   make -C era5 download
    ```
 
-   This stores tables in `scripts/era5land/tables/era5-cmor-tables`, outside
+   This stores tables in `era5/tables/era5-cmor-tables`, outside
    the Python package. For an installed wheel or a differently located table
    checkout, set `HEAL_ERA5_TABLES_DIR` to the `era5-cmor-tables` directory:
 
@@ -72,7 +66,7 @@ Reflow is optional because direct `fetch`, `remap`, `update`, `clean`, and
 `reflow-queue`:
 
 ```console
-python3 -m pip install -e "scripts/era5land[reflow]"
+python3 -m pip install -e "era5[reflow]"
 ```
 
 ### Development
@@ -80,10 +74,10 @@ python3 -m pip install -e "scripts/era5land[reflow]"
 Install development tools and run the package-local checks:
 
 ```console
-python3 -m pip install -e "scripts/era5land[dev]"
+python3 -m pip install -e "era5[dev]"
 ```
 
-From `scripts/era5land`, run all checks with `tox`, or select one check with
+From `era5`, run all checks with `tox`, or select one check with
 `tox -e lint`, `tox -e types`, or `tox -e test`. The test environment prints
 a terminal coverage report and writes an HTML report to `htmlcov/index.html`.
 
@@ -91,7 +85,7 @@ Ruff also sorts imports using its isort-compatible rules. To apply safe lint
 and import fixes, format the code, then verify linting and types:
 
 ```console
-cd scripts/era5land
+cd era5
 python3 -m ruff check --fix src tests
 python3 -m ruff format src tests
 tox -e lint
@@ -105,7 +99,7 @@ rerunning it.
 ## Layout
 
 ```text
-scripts/era5land/
+era5/
 ├── pyproject.toml
 ├── src/heal_era5/
 │   ├── main.py
@@ -135,8 +129,25 @@ dependencies belong in `pyproject.toml` and are installed by `pip`:
 - `reflow-hpc` is installed with `heal-era5[reflow]` only.
 
 If `heal-era5 ...` fails with
-`ModuleNotFoundError: No module named 'grid_doctor'`, the editable install step
-above has not been applied in the active environment yet.
+`ModuleNotFoundError: No module named 'grid_doctor'`, install the workflow in
+the active environment with `python3 -m pip install -e era5`.
+
+### Updating Grid Doctor
+
+`era5/pyproject.toml` pins Grid Doctor to an exact upstream Git revision. This
+makes production environments reproducible and prevents an unreviewed library
+change from altering conversion output. To upgrade it, use a dedicated change:
+
+1. Choose a reviewed commit from the
+   [Grid Doctor repository](https://github.com/freva-org/grid-doctor).
+2. Replace the revision in `era5/pyproject.toml`.
+3. Reinstall the workflow with `python3 -m pip install -e "era5[dev]"`.
+4. Run `cd era5 && tox` and compare representative output with the previous
+   Grid Doctor revision before deploying production jobs.
+
+The workflow only uses Grid Doctor's public API. A compatibility failure should
+therefore be fixed by updating this recipe or by requesting a public API from
+Grid Doctor, rather than importing private library helpers.
 
 ## Fetching Source Files
 
@@ -168,7 +179,7 @@ newer data is stamped with the generator's current time. This exercises both
 normal and forced `update` selection.
 
 ```console
-python scripts/era5land/generate_dummy_hera5_data.py \
+python era5/generate_dummy_hera5_data.py \
   --root /tmp/heal-era5-fixture \
   --start-year 2020 \
   --end-year 2026
@@ -179,7 +190,7 @@ The start and end options also accept inclusive partial calendar bounds:
 creates source files covering 14 March through 2 April only:
 
 ```console
-python scripts/era5land/generate_dummy_hera5_data.py \
+python era5/generate_dummy_hera5_data.py \
   --root /tmp/heal-era5-fixture \
   --start 20250314 \
   --end 20250402
@@ -190,7 +201,7 @@ fixture files). To first delete the entire fixture root and recreate it, pass
 `--from-scratch`:
 
 ```console
-python scripts/era5land/generate_dummy_hera5_data.py \
+python era5/generate_dummy_hera5_data.py \
   --root /tmp/heal-era5-fixture \
   --start 2025-03 \
   --end 2025-06 \
@@ -386,7 +397,7 @@ sbatch \
   --cpus-per-task=1 \
   --mem=2G \
   --output=/shared/era5_from_grib_reflow/controller-%j.out \
-  --wrap '/home/etor/miniconda3/envs/grid_doctor/bin/heal-era5 reflow-queue --plan /shared/era5_from_grib_reflow/zg_1hr_intervals.txt --run-dir-root /shared/era5_from_grib_reflow/queue_runs --poll-seconds 300 --max-active-runs 1 --command-template "/home/etor/miniconda3/envs/grid_doctor/bin/heal-era5 remap-reflow submit --dataset era5 --freq 1hr --var zg --interval {interval} --batch-files 8 --run-dir {run_dir} --output-path /shared/era5_from_grib_reflow/merged"'
+  --wrap '/home/etor/miniconda3/envs/heal-era5/bin/heal-era5 reflow-queue --plan /shared/era5_from_grib_reflow/zg_1hr_intervals.txt --run-dir-root /shared/era5_from_grib_reflow/queue_runs --poll-seconds 300 --max-active-runs 1 --command-template "/home/etor/miniconda3/envs/heal-era5/bin/heal-era5 remap-reflow submit --dataset era5 --freq 1hr --var zg --interval {interval} --batch-files 8 --run-dir {run_dir} --output-path /shared/era5_from_grib_reflow/merged"'
 ```
 
 The `{interval}` and `{run_dir}` values in `--command-template` are
@@ -399,13 +410,13 @@ If you prefer a reusable file over a long `sbatch --wrap ...` command, generate
 an sbatch wrapper script directly from the controller configuration:
 
 ```console
-/home/etor/miniconda3/envs/grid_doctor/bin/heal-era5 reflow-queue \
+/home/etor/miniconda3/envs/heal-era5/bin/heal-era5 reflow-queue \
   --plan /shared/era5_from_grib_reflow/zg_1hr_intervals.txt \
   --run-dir-root /shared/era5_from_grib_reflow/queue_runs \
   --poll-seconds 300 \
   --max-active-runs 1 \
   --store-path $HOME/.cache/reflow/manifest.db \
-  --command-template "/home/etor/miniconda3/envs/grid_doctor/bin/heal-era5 remap-reflow submit --dataset era5 --freq 1hr --var zg --interval {interval} --batch-files 8 --run-dir {run_dir} --output-path /shared/era5_from_grib_reflow/merged" \
+  --command-template "/home/etor/miniconda3/envs/heal-era5/bin/heal-era5 remap-reflow submit --dataset era5 --freq 1hr --var zg --interval {interval} --batch-files 8 --run-dir {run_dir} --output-path /shared/era5_from_grib_reflow/merged" \
   --write-sbatch /shared/era5_from_grib_reflow/run_reflow_queue.sh \
   --sbatch-account ch1187 \
   --sbatch-partition shared \
@@ -909,7 +920,7 @@ environment, but releases the batch-local memory floor when each child exits.
 
 While a batched subprocess run is active, the remapper writes the current batch
 process state to `.current_batch_pid.json` in the launch directory when
-possible, or falls back to `scripts/era5land/.current_batch_pid.json`.
+possible, or falls back to `era5/.current_batch_pid.json`.
 
 The state file contains:
 

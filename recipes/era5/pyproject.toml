@@ -7,17 +7,17 @@ name = "heal-era5"
 dynamic = ["version"]
 description = "ERA5 and ERA5-Land GRIB to HEALPix conversion workflow"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "cfgrib",
-    "grid-doctor",
-    "reflow-hpc",
+    "grid-doctor @ git+https://github.com/freva-org/grid-doctor.git@c694fc8e8cf3c566b603d49498d27512cb178b27",
     "rich",
     "rich-argparse",
 ]
 
 [project.optional-dependencies]
-dev = ["mypy>=1.11", "pytest>=7", "pytest-cov>=5", "ruff>=0.1", "tox>=4"]
+reflow = ["reflow-hpc"]
+dev = ["mypy>=1.11", "pytest>=7", "pytest-cov>=5", "reflow-hpc", "ruff>=0.1", "tox>=4"]
 
 [project.scripts]
 heal-era5 = "heal_era5.main:main"
@@ -76,27 +76,20 @@ package = editable
 
 [testenv:lint]
 description = Check package formatting and lint rules.
-deps =
-    -e {toxinidir}/../..
-    ruff>=0.1
+extras = dev
 commands =
     python -m ruff check src tests
     python -m ruff format --check src tests
 
 [testenv:test]
 description = Run the ERA5-Land package tests.
-deps =
-    -e {toxinidir}/../..
-    pytest>=7
-    pytest-cov>=5
+extras = dev
 commands =
     python -m pytest -vv -ra --cov=heal_era5 --cov-report=term-missing --cov-report=html:htmlcov {posargs:tests}
 
 [testenv:types]
 description = Run static type checks.
-deps =
-    -e {toxinidir}/../..
-    mypy>=1.11
+extras = dev
 commands =
     python -m mypy src/heal_era5
 """
